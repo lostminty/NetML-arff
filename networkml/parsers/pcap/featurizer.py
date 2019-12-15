@@ -35,6 +35,7 @@ def extract_features(session_dict, capture_source=None, max_port=1024):
     num_dport_init = [0]*max_port
     num_sport_rec = [0]*max_port
     num_dport_rec = [0]*max_port
+    protocols = [0]*537
 
     num_sessions_init = 0
     num_external_init = 0
@@ -47,17 +48,25 @@ def extract_features(session_dict, capture_source=None, max_port=1024):
     num_tcp_sess_rec = 0
     num_udp_sess_rec = 0
     num_icmp_sess_rec = 0
-
+    stats_median = [[]]*21
+    stats_mean=[0.0]*21
     # Iterate over all sessions and aggregate the info
     other_ips = defaultdict(int)
     for key, session in session_dict.items():
+        
         address_1, port_1 = get_ip_port(key[0])
         address_2, port_2 = get_ip_port(key[1])
 
+        stats_median= [x.append(float(y)) for x,y in zip(stats_median,session[8:29])]
+        stats_mean=[x+float(y) for x,y in zip(stats_mean,session[8:29])]
         # Get the first packet and grab the macs from it
-        first_packet = session[0][1]
-        source_mac, destination_mac = extract_macs(first_packet)
+        #sum_packets_size_sent += int(session[10])
+        
+       # sum_packets_size_recv += int(session[11])
+        source_mac, destination_mac = extract_macs(session[1])
+      #  print(source_mac+","+destination_mac+ "  :  " + capture_source)
 
+        protocols[int(session[1][6])] += 1
         # If the source is the cpature source
         if (source_mac == capture_source
                 or address_1 == capture_source):
@@ -67,10 +76,9 @@ def extract_features(session_dict, capture_source=None, max_port=1024):
 
             num_sessions_init += 1
             num_external_init += is_external(address_1, address_2)
-            num_tcp_sess_init += is_protocol(session, '06')
-            num_udp_sess_init += is_protocol(session, '11')
-            num_icmp_sess_init += is_protocol(session, '01')
-
+            num_tcp_sess_init += is_protocol(session[1], '06')
+            num_udp_sess_init += is_protocol(session[1], '11')
+            num_icmp_sess_init += is_protocol(session[1], '01')
             if int(port_1) < max_port:
                 num_sport_init[int(port_1)] += 1
 
@@ -85,9 +93,9 @@ def extract_features(session_dict, capture_source=None, max_port=1024):
 
             num_sessions_rec += 1
             num_external_rec += is_external(address_2, address_1)
-            num_tcp_sess_rec += is_protocol(session, '06')
-            num_udp_sess_rec += is_protocol(session, '11')
-            num_icmp_sess_rec += is_protocol(session, '01')
+            num_tcp_sess_rec += is_protocol(session[1], '06')
+            num_udp_sess_rec += is_protocol(session[1], '11')
+            num_icmp_sess_rec += is_protocol(session[1], '01')
 
             if int(port_1) < max_port:
                 num_sport_rec[int(port_1)] += 1
@@ -104,6 +112,7 @@ def extract_features(session_dict, capture_source=None, max_port=1024):
         axis=0
     )
 
+    
     if num_sessions_init == 0:
         num_sessions_init += 1
     if num_sessions_rec == 0:
@@ -111,7 +120,13 @@ def extract_features(session_dict, capture_source=None, max_port=1024):
 
     num_port_sess = np.asarray(num_port_sess) / \
         (num_sessions_init+num_sessions_rec)
+    protocols = np.asarray(protocols) / (num_sessions_init+num_sessions_rec)
+    stats_mean = np.asarray(stats_mean) / (num_sessions_init+num_sessions_rec)
+    for lst in stats_median:
+      lst.sort()
+      lst=lst[int(len(lst)/2)]
 
+    # print(num_port_sess)
     extra_features = [0]*8
     extra_features[0] = num_external_init/num_sessions_init
     extra_features[1] = num_tcp_sess_init/num_sessions_init
@@ -122,6 +137,7 @@ def extract_features(session_dict, capture_source=None, max_port=1024):
     extra_features[5] = num_tcp_sess_rec/num_sessions_rec
     extra_features[6] = num_udp_sess_rec/num_sessions_rec
     extra_features[7] = num_icmp_sess_rec/num_sessions_rec
-
-    feature_vector = np.concatenate((num_port_sess, extra_features), axis=0)
+#    extra_features[8] = sum_packets_size_sent / (num_sessions_init+num_sessions_rec)
+#    extra_features[9] = sum_packets_size_recv / (num_sessions_init+num_sessions_rec)
+    feature_vector = np.concatenate((num_port_sess,extra_features,protocols), axis=0)
     return feature_vector, capture_source, list(other_ips.keys()), capture_ip_source

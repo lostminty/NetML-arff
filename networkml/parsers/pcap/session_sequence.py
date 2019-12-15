@@ -120,7 +120,7 @@ def create_dataset(
             for key, value in session_dict.items():
                 session_info = featurize_session(key, value, source=source)
 
-                first_time = value[0][0].timestamp()
+                first_time = value[0].timestamp()
                 prior_time = None
                 for timestamp in timestamps:
                     time = timestamp.timestamp()

@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
-
+from sklearn.neighbors import KNeighborsClassifier
 from networkml.algorithms.base import BaseAlgorithm
 from networkml.utils.common import Common
 from networkml.utils.model import Model
@@ -59,6 +59,16 @@ class NetworkML():
                               model=self.model, model_hash=self.model_hash,
                               model_path=self.args.trained_model).eval(self.args.algorithm)
 
+            elif self.args.algorithm == 'randomforest':
+                m = RandomForestClassifier(
+                    n_estimators=100,
+                    min_samples_split=5,
+                    class_weight='balanced'
+                )
+                BaseAlgorithm(files=self.files, config=self.config,
+                              model=self.model, model_hash=self.model_hash,
+                              model_path=self.args.trained_model).train(self.args.path,
+                                self.args.save, m, self.args.algorithm)
             ## Random forests refers to a decision tree-based model
             elif self.args.algorithm == 'randomforest':
                 BaseAlgorithm(files=self.files, config=self.config,
@@ -98,6 +108,16 @@ class NetworkML():
                               model=self.model, model_hash=self.model_hash,
                               model_path=self.args.trained_model).train(self.args.path,
                                 self.args.save, m, self.args.algorithm)
+            ## Random forests refers to a k-nearest neighbors model
+            elif self.args.algorithm == 'knn':
+                print(len(self.conf_labels)+"!!!!")
+                m = KNeighborsClassifier(
+                    n_neighbors=len(self.conf_labels)
+                )
+                BaseAlgorithm(files=self.files, config=self.config,
+                              model=self.model, model_hash=self.model_hash,
+                              model_path=self.args.trained_model).train(self.args.path,
+                                self.args.save, m, self.args.algorithm)
 
             ## SOS refers to statistical outlier selection model
             elif self.args.algorithm == 'sos':
@@ -124,6 +144,12 @@ class NetworkML():
                               model=self.model, model_hash=self.model_hash,
                               model_path=self.args.trained_model).test(self.args.path,
                                 self.args.save)
+            elif self.args.algorithm == 'knn':
+                BaseAlgorithm(files=self.files, config=self.config,
+                              model=self.model, model_hash=self.model_hash,
+                              model_path=self.args.trained_model).test(self.args.path,
+                                self.args.save)
+
 
             ## SOS refers to statistical outlier selection model
             elif self.args.algorithm == 'sos':
@@ -136,7 +162,7 @@ class NetworkML():
         """
         parser = argparse.ArgumentParser()
         parser.add_argument('--algorithm', '-a', default='onelayer',
-                            choices=['onelayer', 'randomforest', 'sos'],
+                            choices=['onelayer', 'randomforest', 'sos', 'knn'],
                             help='which algorithm to run')
         parser.add_argument('--format', '-f', default='pcap',
                             choices=['netflow', 'pcap'],

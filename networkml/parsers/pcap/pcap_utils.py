@@ -51,17 +51,10 @@ def extract_macs(packet):
         destination_mac: Destination MAC address
     '''
 
-    source_mac = packet[12:24]
-    dest_mac = packet[0:12]
+    source_mac = packet[0]
+    dest_mac = packet[1]
 
-    source_mac = ':'.join(source_mac[i:i+2]
-                          for i in range(0, len(source_mac), 2)
-                          )
-    destination_mac = ':'.join(dest_mac[i:i+2]
-                               for i in range(0, len(dest_mac), 2)
-                               )
-
-    return source_mac, destination_mac
+    return source_mac, dest_mac
 
 
 def get_indiv_source(sessions, address_type='MAC'):
@@ -78,17 +71,19 @@ def get_indiv_source(sessions, address_type='MAC'):
         capture_source: Address of the capture source
         ip_mac_pairs: Counts of appearances of ip:mac pairs
     '''
-
+   
     # Number of sessions involving the address
     ip_mac_pairs = defaultdict(int)
 
     # Count the incoming/outgoing sessions for all addresses
     for key in sessions:
+        
         source_address, _ = get_ip_port(key[0])
         destination_address, _ = get_ip_port(key[1])
 
         # Get the first packet and grab the macs from it
-        first_packet = sessions[key][0][1]
+        first_packet = sessions[key][1]
+        
         source_mac, destination_mac = extract_macs(first_packet)
 
         # Compute the IP/MAC address pairs
@@ -154,7 +149,7 @@ def get_source(sessions, address_type='MAC'):
         for session_dict in sessions:
             # Get the ip mac address pairs for each session dict
             _, ip_mac_pairs = get_indiv_source(session_dict)
-            # Combine with previous stats
+            #ombine with previous stats
             all_pairs += Counter(ip_mac_pairs)
 
         # Find the most common address
@@ -258,9 +253,10 @@ def is_protocol(session, protocol):
     Returns:
         is_protocol: True or False indicating if this is a TCP session
     '''
-
-    p = extract_protocol(session)
-    if protocol == p:
+    
+    p = int(session[7])
+   # print(p+":"+protocol)
+    if int(protocol) == p:
         return True
     return False
 
@@ -348,68 +344,44 @@ def get_length(packet):
 
 
 def featurize_session(key, packets, source=None):
-    # Global session properties
+
+    mac_1, mac_2 = extract_macs(packets[1])
+    protocol = extract_protocol(packets[1])
+    packets=packets[1]
     address_1, _ = get_ip_port(key[0])
     address_2, _ = get_ip_port(key[1])
+    external = is_external(address_1, address_2)
     if address_1 == source or address_2 == source or source == None:
-        initiated_by_source = None
-        if address_1 == source:
-            initiated_by_source = True
-        if address_2 == source:
-            initiated_by_source = False
-
-        mac_1, mac_2 = extract_macs(packets[0][1])
-        protocol = extract_protocol(packets)
-        external = is_external(address_1, address_2)
-
-        # Packet specific properties
-        size_to_1 = 0
-        size_to_2 = 0
-
-        first_time = packets[0][0].timestamp()
-        last_time = packets[-1][0].timestamp()
-
-        num_sent_by_1 = 0
-        num_sent_by_2 = 0
-        for packet in packets:
-            source_mac, _ = extract_macs(packet[1])
-
-            if source_mac == mac_1:
-                size_to_2 = get_length(packet[1])
-                num_sent_by_1 += 1
-            if source_mac == mac_2:
-                size_to_1 = get_length(packet[1])
-                num_sent_by_2 += 1
-        if (num_sent_by_1 + num_sent_by_2) > 1:
-            elapsed_time = last_time - first_time
-            # don't divide by zero, if no time has elapsed then divide by 1
-            if elapsed_time == 0:
-                elapsed_time = 1
-            freq_1 = num_sent_by_1/elapsed_time
-            freq_2 = num_sent_by_2/elapsed_time
-        else:
-            freq_1 = 1
-            freq_2 = 1
+         initiated_by_source = None
+         if address_1 == source:
+             initiated_by_source = True
+         if address_2 == source:
+             initiated_by_source = False
+         external = is_external(address_1, address_2)
+         time_elapsed = int(packets[28])
+         if time_elapsed  == 0:
+           time_elapsed = 1
+         freq_1 =int(packets[8])/time_elapsed
+         freq_2 =int(packets[10])/time_elapsed
 
         # Netflow-like session info
-        session_info = {
-            'start time': packets[0][0],
+         session_info = {
+            'start time': packets[29],
             'initiated by source': initiated_by_source,
             'external session': external,
             'source': key[0],
             'destination': key[1],
-            'protocol': protocol,
-            'data to source': size_to_1,
-            'data to destination': size_to_2,
-            'packets to source': num_sent_by_2,
-            'packets to destination': num_sent_by_1,
+            'protocol': packets[6],
+            'data to source': int(packets[11]),
+            'data to destination': int(packets[9]),
+            'packets to source': int(packets[10]),
+            'packets to destination': int(packets[8]),
             'source frequency': freq_1,
             'destination frequency': freq_2,
-        }
-        return session_info
+         }
+         return session_info
     else:
-        return None
-
+       return None
 
 def get_ip_port(socket_str):
     """

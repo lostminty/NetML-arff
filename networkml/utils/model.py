@@ -106,7 +106,8 @@ class Model:
                     )
                 X.append(feature_list)
                 last_packet = list(session_dict.items())[-1]
-                timestamps.append(last_packet[1][0][0])
+                
+                timestamps.append(last_packet[1])
 
         if len(X) == 0:
             return None, None, None, None, None
