@@ -1,7 +1,7 @@
 from collections import defaultdict
 
 import numpy as np
-
+import json
 from networkml.parsers.pcap.pcap_utils import extract_macs
 from networkml.parsers.pcap.pcap_utils import get_ip_port
 from networkml.parsers.pcap.pcap_utils import get_source
@@ -22,14 +22,15 @@ def extract_features(session_dict, capture_source=None, max_port=1024):
         feature_vector: Vector containing the featurized representation
                         of the input pcap.
     '''
-
+#    print(session_dict)
     address_type = 'MAC'
-
-    # If the capture source isn't specified, default to the most used address
+    #capture_source_string = get_source(session_dict, address_type=address_type)
     if capture_source is None:
         capture_source = get_source(session_dict, address_type=address_type)
+        #print("!")
     capture_ip_source = get_source(session_dict, address_type='IP')
 
+#    print(capture_source+ " : "+capture_ip_source)
     # Initialize some counter variables
     num_sport_init = [0]*max_port
     num_dport_init = [0]*max_port
@@ -56,14 +57,15 @@ def extract_features(session_dict, capture_source=None, max_port=1024):
         
         address_1, port_1 = get_ip_port(key[0])
         address_2, port_2 = get_ip_port(key[1])
-
-        stats_median= [x.append(float(y)) for x,y in zip(stats_median,session[8:29])]
-        stats_mean=[x+float(y) for x,y in zip(stats_mean,session[8:29])]
+#        print(str(session)+ " ! ")
+#        stats_median=[x.append(int(y)) for x,y in zip(stats_median,session[1][8:29])]
+#        stats_mean=[x+float(y) for x,y in zip(stats_mean,session[1][8:29])]
         # Get the first packet and grab the macs from it
         #sum_packets_size_sent += int(session[10])
         
        # sum_packets_size_recv += int(session[11])
-        source_mac, destination_mac = extract_macs(session[1])
+        source_mac, destination_mac = session[1][1],session[1][0]
+#        print(source_mac)
       #  print(source_mac+","+destination_mac+ "  :  " + capture_source)
 
         protocols[int(session[1][6])] += 1
@@ -120,11 +122,14 @@ def extract_features(session_dict, capture_source=None, max_port=1024):
 
     num_port_sess = np.asarray(num_port_sess) / \
         (num_sessions_init+num_sessions_rec)
+    
+    with open("/home/bccc1/output.json", 'a+') as output_file:
+            json.dump(num_port_sess.tolist(), output_file)
     protocols = np.asarray(protocols) / (num_sessions_init+num_sessions_rec)
     stats_mean = np.asarray(stats_mean) / (num_sessions_init+num_sessions_rec)
-    for lst in stats_median:
-      lst.sort()
-      lst=lst[int(len(lst)/2)]
+#    for lst in stats_median:
+ #     lst.sort()
+  #    lst=lst[int(len(lst)/2)]
 
     # print(num_port_sess)
     extra_features = [0]*8
@@ -139,5 +144,5 @@ def extract_features(session_dict, capture_source=None, max_port=1024):
     extra_features[7] = num_icmp_sess_rec/num_sessions_rec
 #    extra_features[8] = sum_packets_size_sent / (num_sessions_init+num_sessions_rec)
 #    extra_features[9] = sum_packets_size_recv / (num_sessions_init+num_sessions_rec)
-    feature_vector = np.concatenate((num_port_sess,extra_features,protocols), axis=0)
+    feature_vector = np.concatenate((num_port_sess,extra_features,protocols,stats_mean), axis=0)
     return feature_vector, capture_source, list(other_ips.keys()), capture_ip_source

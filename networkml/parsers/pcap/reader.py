@@ -61,7 +61,7 @@ def packetizer(path):
         data = line.decode('utf-8').split(",")
 #        print(data)
         head = parse_packet_head(data)
-        packet_dict[head[1:]] = head[0],data
+        packet_dict[head[1:]] = head[0],data,data[30]
     return packet_dict
 
 
@@ -85,10 +85,6 @@ def sessionizer(path, duration=None, threshold_time=None):
     # Get the packets from the pcap
     packet_dict = packetizer(path)
 
-    # Go through the packets one by one and add them to the session dict
     sessions = []
-
-
-
     sessions.append(packet_dict)
     return sessions
