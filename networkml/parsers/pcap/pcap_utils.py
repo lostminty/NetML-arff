@@ -61,8 +61,8 @@ def extract_macs(packet):
 #                               for i in range(0, len(dest_mac), 2)
  #                              )
 #    print(source_mac)
-    source_mac = packet[1]
-    dest_mac=packet[0]
+    source_mac = packet[0]
+    dest_mac=packet[1]
     return source_mac, dest_mac
 
 
@@ -90,6 +90,8 @@ def get_indiv_source(sessions, address_type='MAC'):
         source_address, _ = get_ip_port(key[0])
         destination_address, _ = get_ip_port(key[1])
 #        print(sessions[key][0][2])
+#        print(key)
+ #       print(sessions[key])
         # Get the first packet and grab the macs from it
         first_packet = sessions[key][1]
         
