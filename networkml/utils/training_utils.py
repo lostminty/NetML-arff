@@ -14,7 +14,11 @@ from sklearn.model_selection import cross_val_score
 from networkml.parsers.pcap.featurizer import extract_features
 from networkml.parsers.pcap.pcap_utils import get_source
 from networkml.parsers.pcap.reader import parallel_sessionizer
+<<<<<<< HEAD
+from concurrent.futures import ProcessPoolExecutor,wait
+=======
 
+>>>>>>> parallel_sessionizer
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__file__.split(os.path.sep)[-1])
@@ -118,9 +122,17 @@ def read_data(data_dir, duration=None, labels=None):
 
     # Go through all the files in the directory
     logger.info('Found {0} pcap files to read.'.format(len(files)))
-    pcap_file_sessions = parallel_sessionizer(logger, files, duration=duration)
+    pcap_file_sessions = parallel_sessionizer(files, duration=duration)
 
+<<<<<<< HEAD
+#    files =[x for x in files if x not in not_done]
+    executor = ProcessPoolExecutor()
+    futures = []
     count = 0
+#    input_count = 0
+=======
+    count = 0
+>>>>>>> parallel_sessionizer
     for filename in files:
         count += 1
         # Extract the label from the filename
@@ -131,6 +143,32 @@ def read_data(data_dir, duration=None, labels=None):
         logger.info('Reading {0} ({1} bytes) as {2} ({3}/{4})'.format(
             name, os.path.getsize(filename), label, count, len(files)))
         # Bin the sessions with the specified time window
+<<<<<<< HEAD
+        sessions,lpi_sessions = pcap_file_sessions.get(filename, {})
+        # Get the capture source from the binned sessions
+        capture_source = get_source(sessions)
+
+        # For each of the session bins, compute the  full feature vectors
+        for session_dict,lpi_session in zip(sessions,lpi_sessions):
+            features,_,_,_=extract_features(session_dict,lpi_session,capture_source=capture_source)
+#            input_count += 1
+            X.append(features)
+            y.append(assigned_labels.index(label))
+
+            # Store the feature vector and the labels
+    
+
+ #   wait([future for future,label in futures])
+    
+  #  for (future,label) in futures:
+   #      features,_,_,_ = future.result()
+    #     X.append(features)
+     #    y.append(assigned_labels.index(label))
+
+        # Update the labels to reflect the new assignments
+    new_labels = assigned_labels + \
+    [l for l in labels if l not in assigned_labels]
+=======
         binned_sessions = pcap_file_sessions.get(filename, {})
         # Get the capture source from the binned sessions
         capture_source = get_source(binned_sessions)
@@ -149,6 +187,7 @@ def read_data(data_dir, duration=None, labels=None):
         # Update the labels to reflect the new assignments
         new_labels = assigned_labels + \
             [l for l in labels if l not in assigned_labels]
+>>>>>>> parallel_sessionizer
 
     try:
         return np.stack(X), np.stack(y), new_labels

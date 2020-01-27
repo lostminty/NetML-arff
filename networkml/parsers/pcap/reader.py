@@ -1,15 +1,26 @@
 import binascii
+<<<<<<< HEAD
 import csv
 import io
 import gzip
 import datetime
 import os
+import sys
+import subprocess
+import pickle
 from collections import OrderedDict
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed,wait
 import pyshark
 
 CSV_FIELDS = ('session_no', 'key', 'timestamp', 'packet')
 
+=======
+import datetime
+from collections import OrderedDict
+from concurrent.futures import ProcessPoolExecutor
+import pyshark
+
+>>>>>>> parallel_sessionizer
 
 def parse_packet_head(packet):
     '''
@@ -69,32 +80,42 @@ def packetizer(path):
     '''
     packet_dict = OrderedDict()
     highest_layers_dict = {}
+<<<<<<< HEAD
+    FNULL = open(os.devnull, 'w')
+    proc = subprocess.Popen(
+        '$LPI_PATH ' + path,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=FNULL
+    )
+    
+    lpi_data = []
+    # Go through all the lines of the output
+    for line in proc.stdout:
+        data = line.decode('utf-8').split(",")
+#        print(data)
+        lpi_data.append(data)
+
+=======
+>>>>>>> parallel_sessionizer
     with pyshark.FileCapture(
             path, use_json=True, include_raw=True, keep_packets=False,
             custom_parameters=['-o', 'tcp.desegment_tcp_streams:false', '-n']) as cap:
         for packet in cap:
+            data = packet.get_raw_packet()
             head = parse_packet_head(packet)
-            if head is None:
-                continue
-            raw_packet = packet.get_raw_packet()
-            payload_offset = len(raw_packet)
-            transport_payload_size = 0
-            # Strip payload beyond transport layer, if any.
-            if packet.transport_layer:
-                transport_layer = packet[packet.transport_layer]
-                if hasattr(transport_layer, 'payload_raw'):
-                    transport_payload_size = int(transport_layer.payload_raw[2])
-                elif hasattr(transport_layer, 'length_raw'):
-                    transport_payload_size = int(transport_layer.length_raw[0], 16)
-            payload_offset = min(len(raw_packet) - transport_payload_size, 128)
-            keys, highest_layers = head
-            stripped_data = raw_packet[:payload_offset]
-            packet_dict[keys] = binascii.hexlify(stripped_data).decode('utf-8')
-            for key, highest_layer in highest_layers.items():
-                if key not in highest_layers_dict:
-                    highest_layers_dict[key] = set()
-                highest_layers_dict[key].update({highest_layer})
+            if head is not None:
+                keys, highest_layers = head
+                packet_dict[keys] = binascii.hexlify(data).decode('utf-8')
+                for key, highest_layer in highest_layers.items():
+                    if key not in highest_layers_dict:
+                        highest_layers_dict[key] = set()
+                    highest_layers_dict[key].update({highest_layer})
+<<<<<<< HEAD
+    return packet_dict, highest_layers_dict,lpi_data
+=======
     return packet_dict, highest_layers_dict
+>>>>>>> parallel_sessionizer
 
 
 def sessionizer(path, duration=None, threshold_time=None):
@@ -115,7 +136,11 @@ def sessionizer(path, duration=None, threshold_time=None):
     '''
 
     # Get the packets from the pcap
+<<<<<<< HEAD
+    packet_dict, _,lpi_data = packetizer(path)
+=======
     packet_dict, _ = packetizer(path)
+>>>>>>> parallel_sessionizer
 
     # Go through the packets one by one and add them to the session dict
     sessions = []
@@ -168,10 +193,18 @@ def sessionizer(path, duration=None, threshold_time=None):
                 session_start = session_starts[key_2]
 
             key = key_1
+<<<<<<< HEAD
+#            if (session_start - first_packet_time).total_seconds() > threshold_time:
+            working_dict[key] = []
+
+        # Add the session to the session dict if its start time is after the cutoff
+=======
             if (session_start - first_packet_time).total_seconds() > threshold_time:
                 working_dict[key] = []
 
-        # Add the session to the session dict if its start time is after the cutoff
+        # Add the session to the session dict if it's start time is after
+        # the cutoff
+>>>>>>> parallel_sessionizer
         if key in working_dict:
             working_dict[key].append((head[0], packet))
 
@@ -180,7 +213,26 @@ def sessionizer(path, duration=None, threshold_time=None):
             sessions.append(working_dict)
     if duration is None:
         sessions.append(working_dict)
-    return sessions
+<<<<<<< HEAD
+  
+    lpi_sessions = []
+    working_dict = []
+    start_time = None
+    for data in lpi_data:
+       time =  datetime.datetime.fromtimestamp(float(data[-2]))
+       if start_time is None: 
+        start_time = time
+        working_dict = []
+
+       if duration is not None:
+         if (time-start_time).total_seconds() >= duration:
+            lpi_sessions.append(working_dict)
+            working_dict = []
+            start_time = time
+       working_dict.append(data)
+
+    lpi_sessions.append(working_dict)
+    return sessions,lpi_sessions
 
 
 def csv_suffix():
@@ -202,6 +254,21 @@ def pcap_filename_to_csv_filename(pcap_filename, out_dir):
     return csv_filename
 
 
+def pcap_filename_to_arff_filename(pcap_filename, out_dir):
+    '''
+    Convert pcap filename to CSV filename.
+
+    Args:
+        pcap_filename: full path to pcap file.
+        out_dir: directory for new CSV file.
+    Returns:
+        name of CSV file.
+    '''
+    csv_base = os.path.basename(pcap_filename)
+    csv_filename = os.path.join(out_dir, '.'.join((csv_base[:csv_base.rfind('.')], 'arff')))
+    return csv_filename
+
+
 def pcap_to_sessioncsv(out_dir, pcap_filename, pcap_sessions):
     '''
     Write session dicts to gzipped CSV file (opposite of pcap_to_sessioncsv()).
@@ -211,6 +278,7 @@ def pcap_to_sessioncsv(out_dir, pcap_filename, pcap_sessions):
         pcap_filename: path to original pcap file.
         pcap_sessions: list of session dicts.
     '''
+    pcap_sessions,lpi_data = pcap_sessions
     csv_filename = pcap_filename_to_csv_filename(pcap_filename, out_dir)
     with gzip.open(csv_filename, 'wb') as csv_file:
         writer = csv.DictWriter(
@@ -224,6 +292,9 @@ def pcap_to_sessioncsv(out_dir, pcap_filename, pcap_sessions):
                         'key': '-'.join(key),
                         'timestamp': timestamp.timestamp(),
                         'packet': packet})
+
+    
+
 
 
 def sessioncsv_to_sessions(csv_filename):
@@ -254,10 +325,11 @@ def sessioncsv_to_sessions(csv_filename):
                 (datetime.datetime.fromtimestamp(float(row['timestamp'])), row['packet']))
     if working_dict:
         sessions.append(working_dict)
+   
     return sessions
 
 
-def parallel_sessionizer(logger, pcap_files, duration=None, threshold_time=None, csv_out_dir=None):
+def parallel_sessionizer(pcap_files, duration=None, threshold_time=None, csv_out_dir=None):
     '''
     Run sessionizer() in parallel across many pcap files.
 
@@ -269,9 +341,11 @@ def parallel_sessionizer(logger, pcap_files, duration=None, threshold_time=None,
     Returns:
         dict of session_dicts, keyed by pcap filename.
     '''
+    threshold_time = None
     # Process smaller files first - many small files can be processed in parallel.
     pcap_files = sorted(pcap_files, key=os.path.getsize, reverse=True)
     csv_filenames = {}
+    arff_filenames = {}
     for pcap_file in pcap_files:
         if csv_out_dir is not None:
             csv_dir = csv_out_dir
@@ -279,29 +353,104 @@ def parallel_sessionizer(logger, pcap_files, duration=None, threshold_time=None,
             csv_dir = os.path.dirname(pcap_file)
         csv_file = pcap_filename_to_csv_filename(pcap_file, csv_dir)
         csv_filenames[pcap_file] = csv_file
+        arff_file = pcap_filename_to_arff_filename(pcap_file,csv_dir)
+        arff_filenames[pcap_file] = arff_file
 
     with ProcessPoolExecutor() as executor:
         unparsed_pcaps = []
+        load_futures = []
         pcap_file_sessions = {}
         # Retrieve pre-cached CSVs.
         for pcap_file in pcap_files:
             csv_file = csv_filenames[pcap_file]
+#            arff_file = arff_filenames[pcap_file]
             if os.path.exists(csv_file):
-                pcap_file_sessions[pcap_file] = sessioncsv_to_sessions(csv_file)
+                 load_futures.append((executor.submit(sessioncsv_to_sessions,csv_file),executor.submit(run_lpi,pcap_file,duration,threshold_time,csv_dir),pcap_file))
+                 
+                 
             else:
                 unparsed_pcaps.append(pcap_file)
+        wait_futures = []
+        for row  in load_futures:
+           wait_futures.extend((row[0],row[1]))
+        wait(wait_futures)
+        for pyfuture,lpifuture,pcap_file in load_futures:
+           pcap_file_sessions[pcap_file]= (pyfuture.result(),lpifuture.result())
+
         futures = {
             executor.submit(sessionizer, pcap_file, duration, threshold_time): pcap_file
             for pcap_file in unparsed_pcaps}
         for future in as_completed(futures):
             pcap_file = futures.get(future, None)
             if pcap_file:
-                logger.info('got sessionizer result from {0}'.format(pcap_file))
+                print('got sessionizer result from {0}'.format(pcap_file))
                 try:
                     # 24h timeout per file.
                     pcap_file_sessions[pcap_file] = future.result(timeout=(24 * 60 * 60))
                     csv_file = csv_filenames[pcap_file]
                     pcap_to_sessioncsv(os.path.dirname(csv_file), pcap_file, pcap_file_sessions[pcap_file])
                 except Exception as err:
-                    logger.error('exception processing {0}: {1}'.format(pcap_file, err))
+                    print('exception processing {0}: {1}'.format(pcap_file, err))
         return pcap_file_sessions
+
+
+
+def run_lpi(path,duration,threshold_time,out_dir):
+    print(path)
+    arff_file = pcap_filename_to_arff_filename(path,out_dir)
+    if os.path.exists(arff_file) and False:
+       print("!")
+       with open(arff_file,'rb') as fp:
+        lpi_sessions = pickle.load(fp)
+        return lpi_sessions
+
+    FNULL = open(os.devnull, 'w')
+    proc = subprocess.Popen(
+        '$LPI_PATH ' + path,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=FNULL
+    )
+
+    lpi_data = []
+    # Go through all the lines of the output
+    for line in proc.stdout:
+        data = line.decode('utf-8').split(",")
+#        print(data)
+        lpi_data.append(data)
+
+    lpi_sessions = []
+    working_dict = []
+    start_time = None
+    for data in lpi_data:
+       time =  datetime.datetime.fromtimestamp(float(data[-2]))
+       if start_time is None: 
+        start_time = time
+        working_dict = []
+
+       if duration is not None:
+         if (time-start_time).total_seconds() >= duration:
+            lpi_sessions.append(working_dict)
+            working_dict = []
+            start_time = time
+       working_dict.append(data)
+
+    lpi_sessions.append(working_dict)
+    with open(arff_file,'wb') as fp:
+      pickle.dump(lpi_sessions,fp)
+
+    return lpi_sessions
+
+=======
+    return sessions
+
+
+def parallel_sessionizer(pcap_files, duration=None, threshold_time=None):
+    with ProcessPoolExecutor() as executor:
+        futures = {
+            pcap_file: executor.submit(sessionizer, pcap_file, duration, threshold_time)
+            for pcap_file in pcap_files}
+        pcap_file_sessions = {
+            pcap_file: future.result() for pcap_file, future in futures.items()}
+        return pcap_file_sessions
+>>>>>>> parallel_sessionizer

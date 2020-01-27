@@ -6,6 +6,10 @@ import sys
 import numpy as np
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
+<<<<<<< HEAD
+import arff
+=======
+>>>>>>> parallel_sessionizer
 
 from networkml.parsers.pcap.featurizer import extract_features
 from networkml.parsers.pcap.reader import parallel_sessionizer
@@ -89,12 +93,27 @@ class Model:
         timestamps = []
         if filepath not in self.pcap_file_sessions:
             self.sessionize_pcaps([filepath])
+<<<<<<< HEAD
+        binned_sessions,lpi_sessions = self.pcap_file_sessions.get(filepath, {})
+=======
         binned_sessions = self.pcap_file_sessions.get(filepath, {})
+>>>>>>> parallel_sessionizer
         self.sessions = binned_sessions
 
         if len(binned_sessions) is 0:
             return None, None, None, None, None
 
+<<<<<<< HEAD
+        for session_dict,lpi_data in zip(binned_sessions,lpi_sessions):
+            if session_dict is not None and len(session_dict) > 0:
+                if source_ip is None:
+                    feature_list, source_ip, other_ips, capture_source_ip = extract_features(
+                        session_dict,lpi_data
+                    )
+                else:
+                    feature_list, _, other_ips, capture_source_ip = extract_features(
+                        session_dict,lpi_data,
+=======
         for session_dict in binned_sessions:
             if session_dict is not None and len(session_dict) > 0:
                 if source_ip is None:
@@ -104,6 +123,7 @@ class Model:
                 else:
                     feature_list, _, other_ips, capture_source_ip = extract_features(
                         session_dict,
+>>>>>>> parallel_sessionizer
                         capture_source=source_ip
                     )
                 X.append(feature_list)
@@ -116,6 +136,37 @@ class Model:
         full_features = np.stack(X)
 
         # Mean normalize the features
+<<<<<<< HEAD
+#        try:
+#            full_features -= np.expand_dims(self.means, 0)
+#            full_features /= np.expand_dims(self.stds, 0)
+#            features = full_features[:, self.feature_list]
+#        except Exception as e:  # pragma: no cover
+#            self.logger.error('Failed because: {0}'.format(str(e)))
+#            sys.exit(1)
+        return full_features[:,self.feature_list], source_ip, timestamps, other_ips, capture_source_ip
+
+
+    def arff_unmake(self,arff_object):
+        
+        X_all, y_all,attributes= [], [], []
+        for datum,attribute in zip(arff_object['data'],arff_object['attributes']):
+           X_all.append(datum[0:-1])
+           y_all.append(int(datum[-1]))
+           if not attribute[0]=='class':
+            attributes.append(int(attribute[0]))
+        return X_all,y_all,attributes
+
+    def arff_make(self,X,y,labels):
+        
+        X_labelled = [data+[labels[label]] for label,data in zip(y.tolist(),X.tolist())]
+        attribs = [(str(attrib),'REAL') for attrib in range(len(X_labelled[0])-1)]
+        attribs.append(('class',labels))
+        arff_struct = {'relation':'networkml','attributes':attribs,'data':X_labelled}
+#        print(X_labelled)
+        return arff_struct
+
+=======
         try:
             full_features -= np.expand_dims(self.means, 0)
             full_features /= np.expand_dims(self.stds, 0)
@@ -124,6 +175,7 @@ class Model:
             self.logger.error('Failed because: {0}'.format(str(e)))
             sys.exit(1)
         return features, source_ip, timestamps, other_ips, capture_source_ip
+>>>>>>> parallel_sessionizer
 
     def train(self, data_dir):
         '''
@@ -136,13 +188,106 @@ class Model:
         '''
 
         self.logger.info('Reading data')
+<<<<<<< HEAD
+#        self.feature_list =[4807,4801,4788,4800,4802,4799,4803,4804,4789,4790,4791,4792,4797,4796,4795,4794,4793,4808,4798,4805,4806,4668,4667,4677,4665,4666,4664,4678,4663,4662,4669,4670,4671,4680,4676,4682,4681,4679,4672,4673,4674,4675,4098,4097,4381,1077,1147,4640,4637,4101,4096,1159,3207,1162,138,4821,4820,4817,4818,4823,4819,4815,4814,4810,4809,4811,4813,4812,4822,4816,4824,4825,4828,4827,4826,4829,3517,1413,4877,4891,4879,4876,4875,4874,4873,4872,4878,4881,4880,4884,4883,4882,4885,4886,4887,4890,4889,4892,4888,4838,4839,4843,4833,4844,4832,4837,4842,4841,4840,4830,4845,4846,4847,4835,4836,4848,4834,4850,4831,4849,4128,4436,4857,4858,4869,4870,4871,4851,4868,4867,4853,4866,4864,4863,4852,4855,4854,4862,4861,4859,4860,4865,4856,1467,123,1469,4127,4113,4102,4763,4762,4756,4755,4766,4764,4758,4759,4760,4761,4754,4753,4752,4747,4765,4746,4748,4751,4749,4750,4757,4745,4734,4732,4733,4725,4731,4730,4729,4728,4727,4735,4736,4737,4742,4744,4743,4741,4726,4738,4739,4740,4724,4722,4720,4723,4721,4707,4712,4713,4710,4711,4709,4715,4705,4704,4708,4714,4716,4706,4719,4718,4717,4464,3160,4103,4398,3072,2048,4695,4696,4703,4691,4689,4690,4692,4687,4693,4694,4702,4688,4697,4700,4701,4685,4699,4686,4698,4684,4683,3195,2171,1024,0,3125,3461,3515,4383,1112,3094,4099,4385,2491,4414,389,4395,3211,4639,1161,137,3708,4100,1104,1538,4104,4422,445,443,2437,4165,3152,1049,4435,4116,1046,4465,4508,4638,4386,4384,1216,4118,1135,2115,3140,1091,68,4141,4167,4496,2070,135,4228,4234,1185,4481,3194,88,2101,2128,4440,4424,1970,3536,53,1926,4393,4548,2950,4568,4112,1705,1163,1655,678,4345,1146,782,1020,1572,912,894,4507,4560,1013]
+#        X_all =  np.loadtxt('X_train.csv',delimiter=",")
+#        y_all = np.loadtxt('y_train.csv',delimiter=',')
+#        new_labels = np.loadtxt('labels.csv',delimiter=',')
+#        new_labels = new_labels.tolist()
+#        X_test_select = np.loadtxt('X_test_select.csv', delimiter=",")
+#        y_train = np.loadtxt('y_train.csv', delimiter=",")
+#        y_test = np.loadtxt('y_text.csv', delimiter=",")
+#        print(X_normed_select)
+
+#        train_arff = self.arff_make(X_normed_select,y_train)
+#        test_arff = self.arff_make(X_test_select,y_test)
+#        train_file = open('train.arff','w')
+#        test_file = open('test.arff','w')
+#        arff.dump(train_arff,train_file)
+#        arff.dump(test_arff,test_file)
+#        sys.exit(1)
+
+
         # First read the data directory for the features and labels
+
+         
+=======
+        # First read the data directory for the features and labels
+>>>>>>> parallel_sessionizer
         X_all, y_all, new_labels = read_data(
             data_dir,
             duration=self.duration,
             labels=self.labels
         )
         self.labels = new_labels
+<<<<<<< HEAD
+        
+
+        self.logger.info('Making data splits')
+        # Split the data into training, validation, and testing sets
+#        X_train, X_test, y_train, y_test = train_test_split(
+#            X_all,
+#            y_all,
+#            test_size=0.2,
+#            random_state=0
+#        )
+
+#        with open('labels.pkl','rb') as fp:
+#          self.labels=pickle.load(fp)
+
+#        np.savetxt('X_all.csv',X_all, delimiter=",")
+#        np.savetxt('X_test.csv',X_test_select, delimiter=",")
+#        np.savetxt('y_all.csv',y_all, delimiter=",")
+#        np.savetxt('y_text.csv',y_test, delimiter=",")
+#        with open('labels.pkl','rb') as fp:
+#            self.labels=pickle.load(fp)
+#        all_file = open('all_train_325.arff')
+#        all_arff= arff.load(all_file)
+#        all_file.close()
+#        _,_,self.feature_list=self.arff_unmake(all_arff)
+#
+#        X_all,y_all = np.loadtxt('X_all.csv',delimiter=',')[:,self.feature_list],np.loadtxt('y_all.csv',delimiter=',')
+        
+        all_arff = self.arff_make(X_all,y_all,new_labels)
+#        test_arff = self.arff_make(X_test_select,y_test)
+        all_file = open('all_mega_flow_index.arff','w')
+#        test_file = open('test.arff','w')
+        arff.dump(all_arff,all_file)
+        all_file.close()
+#        arff.dump(test_arff,test_file)
+        sys.exit(1)
+
+
+
+        self.logger.info('Normalizing features')
+        # Mean normalize the features, saving the means and variances
+#        self.means = X_all.mean(axis=0)
+#        self.stds = X_all.std(axis=0)
+        # Set the zero standard deviations to 1
+#        zero_stds = self.stds <= 1
+#        self.stds[zero_stds] = 1
+        # Apply the mean normalization transformation to the training dataj
+#        X_normed = X_all - np.expand_dims(self.means, 0)
+#        X_normed /= np.expand_dims(self.stds, 0)
+
+        
+        self.logger.info('Doing feature selection')
+        # Select the relevant features from the training set
+#        self.feature_list = select_features(X_normed, y_train)
+        self.logger.info(self.feature_list)
+
+
+ #       X_normed_select = X_normed[:,self.feature_list]
+#        X_test_select = X_test[:,self.feature_list]
+
+ #       np.savetxt('X_normed_select.csv',X_normed_select, delimiter=",")
+ #       np.savetxt('X_test_select.csv',X_test_select, delimiter=",")
+ #       np.savetxt('y_train.csv',y_train, delimiter=",")
+ #       np.savetxt('y_text.csv',y_test, delimiter=",")
+
+ #       sys.exit(1)
+
+=======
 
         self.logger.info('Making data splits')
         # Split the data into training, validation, and testing sets
@@ -169,6 +314,7 @@ class Model:
         self.feature_list = select_features(X_normed, y_train)
         self.logger.info(self.feature_list)
 
+>>>>>>> parallel_sessionizer
         # If hidden size wasn't specified, default to the mean of the number
         # of features and the size of the label space
         if self.hidden_size is None:
@@ -179,6 +325,15 @@ class Model:
             )
 
         # Augment the data with randomly permuted samples
+<<<<<<< HEAD
+#        X_aug, y_aug = self._augment_data(X_normed, y_all)
+
+        # Fit the one layer model to the augmented training data
+#        X_input = X_aug[:, self.feature_list]
+
+        try:
+            self.model.fit(X_all, y_all)
+=======
         X_aug, y_aug = self._augment_data(X_normed, y_train)
 
         # Fit the one layer model to the augmented training data
@@ -186,17 +341,27 @@ class Model:
 
         try:
             self.model.fit(X_input, y_aug)
+>>>>>>> parallel_sessionizer
         except Exception as e:  # pragma: no cover
             self.logger.error('Failed because: {0}'.format(str(e)))
             sys.exit(1)
 
         # Evaulate the model on the augmented test data
+<<<<<<< HEAD
+ #       X_test_input = X_test - np.expand_dims(self.means, 0)
+ #       X_test_input /= np.expand_dims(self.stds, 0)
+ #       X_test_aug, y_test_aug = self._augment_data(X_test_input, y_test)
+ #       predictions = self.model.predict(X_test_aug[:, self.feature_list])
+ #       self.logger.info('F1 score:')
+ #       self.logger.info(f1_score(y_test_aug, predictions, average='weighted'))
+=======
         X_test_input = X_test - np.expand_dims(self.means, 0)
         X_test_input /= np.expand_dims(self.stds, 0)
         X_test_aug, y_test_aug = self._augment_data(X_test_input, y_test)
         predictions = self.model.predict(X_test_aug[:, self.feature_list])
         self.logger.info('F1 score:')
         self.logger.info(f1_score(y_test_aug, predictions, average='weighted'))
+>>>>>>> parallel_sessionizer
 
     def predict(self, filepath, source_ip=None):
         '''
@@ -226,9 +391,13 @@ class Model:
 
     def sessionize_pcaps(self, pcap_files):
         self.pcap_file_sessions.update(parallel_sessionizer(
-            self.logger, pcap_files, duration=self.duration, threshold_time=self.threshold_time))
+            pcap_files, duration=self.duration, threshold_time=self.threshold_time))
 
+<<<<<<< HEAD
+    def get_representation(self, filepath, mean=False, source_ip=None):
+=======
     def get_representation(self, filepath, mean=True, source_ip=None):
+>>>>>>> parallel_sessionizer
         '''
         Computes the mean hidden representation of the input file.
 
